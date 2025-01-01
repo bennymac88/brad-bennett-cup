@@ -15,6 +15,7 @@ interface Player {
     name: string;
     points: number;
     probability?: number;
+    decimalOdds?: number;
 }
 
 interface PaymentConfirmationProps {
@@ -68,17 +69,7 @@ interface OddsCalculatorProps {
 
 // Odds Calculator Component
 const OddsCalculator = ({ title }: OddsCalculatorProps) => {
-    const [players, setPlayers] = useState<Player[]>([
-        { id: 1, name: 'Al T/Cuts 🏆', points: 0 },
-        { id: 2, name: 'Mitzi/Bondy', points: 0 },
-        { id: 3, name: 'Woody/Foulsh', points: 0 },
-        { id: 4, name: 'Pitovich/Berts', points: 0 },
-        { id: 5, name: 'Xav/Tubs', points: 0 },
-        { id: 6, name: 'Macca/Tarch', points: 0 },
-        { id: 7, name: 'Bennet/Shark', points: 0 },
-        { id: 8, name: 'Iddles/Niz', points: 0 }
-    ]);
-
+    const [players, setPlayers] = useState<Player[]>([]);
     const [selectedPlayer, setSelectedPlayer] = useState('');
     const [pointsToAdd, setPointsToAdd] = useState('');
     const [contributorName, setContributorName] = useState('');
@@ -86,22 +77,40 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [confirmationDetails, setConfirmationDetails] = useState<HistoryEntry | null>(null);
 
-    // Load initial data
+    // Fetch initial players based on the title
     useEffect(() => {
-        const loadData = async () => {
+        const fetchPlayers = async () => {
             try {
-                const response = await fetch('/api/bets');
+                const response = await fetch('/players-odds-data.json');
                 const data = await response.json();
-                if (data.players) setPlayers(data.players);
-                if (data.history) setHistory(data.history);
+
+                // Determine which category to use based on the title
+                const categoryKey = title.includes('Winner')
+                    ? 'bradBennettCupWinner'
+                    : 'bradBennettCupWoodenSpoon';
+
+                const initialPlayers = data[categoryKey].players;
+                setPlayers(initialPlayers);
             } catch (error) {
-                console.error('Failed to load data:', error);
+                console.error('Error fetching players:', error);
+                // Fallback to default players if fetch fails
+                setPlayers([
+                    { id: 1, name: 'Al T/Cuts 🏆', points: 0 },
+                    { id: 2, name: 'Mitzi/Bondy', points: 0 },
+                    { id: 3, name: 'Woody/Foulsh', points: 0 },
+                    { id: 4, name: 'Pitovich/Berts', points: 0 },
+                    { id: 5, name: 'Xav/Tubs', points: 0 },
+                    { id: 6, name: 'Macca/Tarch', points: 0 },
+                    { id: 7, name: 'Bennet/Shark', points: 0 },
+                    { id: 8, name: 'Iddles/Niz', points: 0 }
+                ]);
             }
         };
-        loadData();
-    }, []);
 
-    const handleButtonClick = async () => {
+        fetchPlayers();
+    }, [title]);
+
+    const handleButtonClick = () => {
         if (!selectedPlayer || !pointsToAdd || !contributorName) {
             return;
         }
@@ -122,6 +131,18 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
             return player;
         });
 
+        // Recalculate probabilities
+        const totalPoints = newPlayers.reduce((sum, player) => sum + player.points, 0);
+        const playersWithOdds = newPlayers.map(player => {
+            let probability = totalPoints === 0 ? (1 / newPlayers.length) : player.points / totalPoints;
+            probability = Math.max(probability, 0.001); // Minimum 0.1% probability
+            return {
+                ...player,
+                probability,
+                decimalOdds: 1 / probability
+            };
+        });
+
         // Create history entry
         const historyEntry: HistoryEntry = {
             id: Date.now(),
@@ -133,25 +154,8 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
             paid: false
         };
 
-        // Update state
-        setPlayers(newPlayers);
+        setPlayers(playersWithOdds);
         setHistory([historyEntry, ...history]);
-
-        // Save to API
-        try {
-            await fetch('/api/bets', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    players: newPlayers,
-                    history: [historyEntry, ...history]
-                }),
-            });
-        } catch (error) {
-            console.error('Failed to save bet:', error);
-        }
 
         // Show confirmation with details
         setConfirmationDetails(historyEntry);
@@ -163,32 +167,13 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
         setContributorName('');
     };
 
-    const togglePaymentStatus = async (entryId: number) => {
-        const updatedHistory = history.map(entry =>
+    const togglePaymentStatus = (entryId: number) => {
+        setHistory(prevHistory => prevHistory.map(entry =>
             entry.id === entryId
                 ? { ...entry, paid: !entry.paid }
                 : entry
-        );
-        setHistory(updatedHistory);
-
-        try {
-            await fetch('/api/bets/payment', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    entryId,
-                    paid: !history.find(entry => entry.id === entryId)?.paid
-                }),
-            });
-        } catch (error) {
-            console.error('Failed to update payment status:', error);
-        }
+        ));
     };
-
-
-    ////
 
     // Calculate total points and odds
     const totalPoints = players.reduce((sum, player) => sum + player.points, 0);
@@ -308,8 +293,8 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
                                         <button
                                             onClick={() => togglePaymentStatus(entry.id)}
                                             className={`px-3 py-1 rounded-full text-sm ${entry.paid
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-red-100 text-red-700'
                                                 }`}
                                         >
                                             {entry.paid ? 'Paid' : 'Pending'}
