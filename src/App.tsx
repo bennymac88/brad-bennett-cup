@@ -1,7 +1,30 @@
 ﻿import { useState } from "react";
 
+interface HistoryEntry {
+    id: number;
+    timestamp: string;
+    contributor: string;
+    player: string;
+    points: number;
+    gameType: string;
+    paid: boolean;
+}
+
+interface Player {
+    id: number;
+    name: string;
+    points: number;
+    probability?: number;
+}
+
+interface PaymentConfirmationProps {
+    show: boolean;
+    onClose: () => void;
+    details: HistoryEntry | null;
+}
+
 // Payment Confirmation Dialog Component
-const PaymentConfirmation = ({ show, onClose, details }) => {
+const PaymentConfirmation = ({ show, onClose, details }: PaymentConfirmationProps) => {
     if (!show || !details) return null;
 
     return (
@@ -39,9 +62,13 @@ const PaymentConfirmation = ({ show, onClose, details }) => {
     );
 };
 
+interface OddsCalculatorProps {
+    title: string;
+}
+
 // Odds Calculator Component
-const OddsCalculator = ({ title }) => {
-    const [players, setPlayers] = useState([
+const OddsCalculator = ({ title }: OddsCalculatorProps) => {
+    const [players, setPlayers] = useState<Player[]>([
         { id: 1, name: 'Al T/Cuts 🏆', points: 0 },
         { id: 2, name: 'Mitzi/Bondy', points: 0 },
         { id: 3, name: 'Woody/Foulsh', points: 0 },
@@ -55,9 +82,9 @@ const OddsCalculator = ({ title }) => {
     const [selectedPlayer, setSelectedPlayer] = useState('');
     const [pointsToAdd, setPointsToAdd] = useState('');
     const [contributorName, setContributorName] = useState('');
-    const [history, setHistory] = useState([]);
+    const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [showConfirmation, setShowConfirmation] = useState(false);
-    const [confirmationDetails, setConfirmationDetails] = useState(null);
+    const [confirmationDetails, setConfirmationDetails] = useState<HistoryEntry | null>(null);
 
     const handleButtonClick = () => {
         if (!selectedPlayer || !pointsToAdd || !contributorName) {
@@ -71,6 +98,8 @@ const OddsCalculator = ({ title }) => {
 
         // Update players
         const selectedPlayerObj = players.find(p => p.id === parseInt(selectedPlayer));
+        if (!selectedPlayerObj) return;
+
         const newPlayers = players.map(player => {
             if (player.id === parseInt(selectedPlayer)) {
                 return { ...player, points: player.points + points };
@@ -79,7 +108,7 @@ const OddsCalculator = ({ title }) => {
         });
 
         // Create history entry
-        const historyEntry = {
+        const historyEntry: HistoryEntry = {
             id: Date.now(),
             timestamp: new Date().toLocaleString(),
             contributor: contributorName,
@@ -102,7 +131,7 @@ const OddsCalculator = ({ title }) => {
         setContributorName('');
     };
 
-    const togglePaymentStatus = (entryId) => {
+    const togglePaymentStatus = (entryId: number) => {
         setHistory(prevHistory => prevHistory.map(entry =>
             entry.id === entryId
                 ? { ...entry, paid: !entry.paid }
@@ -188,10 +217,10 @@ const OddsCalculator = ({ title }) => {
                                     <td className="p-2">{player.name}</td>
                                     <td className="text-right p-2">{player.points}</td>
                                     <td className="text-right p-2">
-                                        {(player.probability * 100).toFixed(1)}%
+                                        {((player.probability || 0) * 100).toFixed(1)}%
                                     </td>
                                     <td className="text-right p-2">
-                                        {(1 / player.probability).toFixed(2)}
+                                        {(1 / (player.probability || 0.001)).toFixed(2)}
                                     </td>
                                 </tr>
                             ))}
