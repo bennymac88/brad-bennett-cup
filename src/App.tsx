@@ -87,11 +87,11 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
         const fetchGameData = async () => {
             try {
                 // Determine which JSON file to fetch based on the title
-                const jsonFile = title.includes('Winner')
-                    ? '/brad-bennett-winner-data.json'
-                    : '/brad-bennett-wooden-spoon-data.json';
-
-                const response = await fetch(jsonFile);
+                const response = await fetch(
+                    title.includes('Winner')
+                        ? '/brad-bennett-winner-data.json'
+                        : '/brad-bennett-wooden-spoon-data.json'
+                );
                 const data: GameData = await response.json();
 
                 setPlayers(data.players);
@@ -207,25 +207,15 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
 
         setHistory(updatedHistory);
 
-        // Update JSON file (this would typically be done via a backend API)
+        // Note: In a static hosting environment, direct file updates are not possible
+        // This is a placeholder for future backend API implementation
         try {
-            const jsonFile = title.includes('Winner')
-                ? '/brad-bennett-winner-data.json'
-                : '/brad-bennett-wooden-spoon-data.json';
-
             const updatedData: GameData = {
                 players: players,
                 history: updatedHistory
             };
 
-            // NOTE: In a real application, this would be replaced with a backend API call
-            await fetch('/update-game-data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updatedData)
-            });
+            console.log('Payment status update attempted:', updatedData);
         } catch (error) {
             console.error('Error updating payment status:', error);
         }
