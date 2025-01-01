@@ -18,11 +18,6 @@ interface Player {
     decimalOdds?: number;
 }
 
-interface GameData {
-    players: Player[];
-    history: HistoryEntry[];
-}
-
 interface PaymentConfirmationProps {
     show: boolean;
     onClose: () => void;
@@ -82,22 +77,22 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [confirmationDetails, setConfirmationDetails] = useState<HistoryEntry | null>(null);
 
-    // Fetch initial game data
+    // Fetch initial players based on the title
     useEffect(() => {
-        const fetchGameData = async () => {
+        const fetchPlayers = async () => {
             try {
-                // Determine which JSON file to fetch based on the title
-                const response = await fetch(
-                    title.includes('Winner')
-                        ? '/brad-bennett-winner-data.json'
-                        : '/brad-bennett-wooden-spoon-data.json'
-                );
-                const data: GameData = await response.json();
+                const response = await fetch('/players-odds-data.json');
+                const data = await response.json();
 
-                setPlayers(data.players);
-                setHistory(data.history);
+                // Determine which category to use based on the title
+                const categoryKey = title.includes('Winner')
+                    ? 'bradBennettCupWinner'
+                    : 'bradBennettCupWoodenSpoon';
+
+                const initialPlayers = data[categoryKey].players;
+                setPlayers(initialPlayers);
             } catch (error) {
-                console.error('Error fetching game data:', error);
+                console.error('Error fetching players:', error);
                 // Fallback to default players if fetch fails
                 setPlayers([
                     { id: 1, name: 'Al T/Cuts 🏆', points: 0 },
@@ -112,10 +107,10 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
             }
         };
 
-        fetchGameData();
+        fetchPlayers();
     }, [title]);
 
-    const handleButtonClick = async () => {
+    const handleButtonClick = () => {
         if (!selectedPlayer || !pointsToAdd || !contributorName) {
             return;
         }
@@ -159,38 +154,12 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
             paid: false
         };
 
-        // Update local state
         setPlayers(playersWithOdds);
-        const newHistory = [historyEntry, ...history];
-        setHistory(newHistory);
+        setHistory([historyEntry, ...history]);
 
         // Show confirmation with details
         setConfirmationDetails(historyEntry);
         setShowConfirmation(true);
-
-        // Update JSON file (this would typically be done via a backend API)
-        try {
-            const jsonFile = title.includes('Winner')
-                ? '/brad-bennett-winner-data.json'
-                : '/brad-bennett-wooden-spoon-data.json';
-
-            const updatedData: GameData = {
-                players: playersWithOdds,
-                history: newHistory
-            };
-
-            // NOTE: In a real application, this would be replaced with a backend API call
-            // This is a placeholder and will not work in a static file hosting environment
-            await fetch('/update-game-data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updatedData)
-            });
-        } catch (error) {
-            console.error('Error updating game data:', error);
-        }
 
         // Reset form
         setSelectedPlayer('');
@@ -198,27 +167,12 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
         setContributorName('');
     };
 
-    const togglePaymentStatus = async (entryId: number) => {
-        const updatedHistory = history.map(entry =>
+    const togglePaymentStatus = (entryId: number) => {
+        setHistory(prevHistory => prevHistory.map(entry =>
             entry.id === entryId
                 ? { ...entry, paid: !entry.paid }
                 : entry
-        );
-
-        setHistory(updatedHistory);
-
-        // Note: In a static hosting environment, direct file updates are not possible
-        // This is a placeholder for future backend API implementation
-        try {
-            const updatedData: GameData = {
-                players: players,
-                history: updatedHistory
-            };
-
-            console.log('Payment status update attempted:', updatedData);
-        } catch (error) {
-            console.error('Error updating payment status:', error);
-        }
+        ));
     };
 
     // Calculate total points and odds
