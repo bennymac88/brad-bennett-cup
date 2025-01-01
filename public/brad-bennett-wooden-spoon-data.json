@@ -1,0 +1,45 @@
+{
+  "players": [
+    {
+      "id": 1,
+      "name": "Al T/Cuts 🏆",
+      "points": 0
+    },
+    {
+      "id": 2,
+      "name": "Mitzi/Bondy",
+      "points": 0
+    },
+    {
+      "id": 3,
+      "name": "Woody/Foulsh",
+      "points": 0
+    },
+    {
+      "id": 4,
+      "name": "Pitovich/Berts",
+      "points": 0
+    },
+    {
+      "id": 5,
+      "name": "Xav/Tubs",
+      "points": 0
+    },
+    {
+      "id": 6,
+      "name": "Macca/Tarch",
+      "points": 0
+    },
+    {
+      "id": 7,
+      "name": "Bennet/Shark",
+      "points": 0
+    },
+    {
+      "id": 8,
+      "name": "Iddles/Niz",
+      "points": 0
+    }
+  ],
+  "history": []
+}
