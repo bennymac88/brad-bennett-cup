@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { kv } from './vercel-kv-config';
+import { kv } from './vercelKvConfig';
 
 interface HistoryEntry {
     id: number;
