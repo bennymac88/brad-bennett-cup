@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from "react";
+import { kv } from './vercel-kv-config';
 
 interface HistoryEntry {
     id: number;
@@ -18,14 +19,25 @@ interface Player {
     decimalOdds?: number;
 }
 
-interface PaymentConfirmationProps {
-    show: boolean;
-    onClose: () => void;
-    details: HistoryEntry | null;
+interface GameData {
+    players: Player[];
+    history: HistoryEntry[];
 }
 
-// Payment Confirmation Dialog Component
-const PaymentConfirmation = ({ show, onClose, details }: PaymentConfirmationProps) => {
+// Default players configuration
+const DEFAULT_PLAYERS: Player[] = [
+    { id: 1, name: "Al T/Cuts 🏆", points: 0 },
+    { id: 2, name: "Mitzi/Bondy", points: 0 },
+    { id: 3, name: "Woody/Foulsh", points: 0 },
+    { id: 4, name: "Pitovich/Berts", points: 0 },
+    { id: 5, name: "Xav/Tubs", points: 0 },
+    { id: 6, name: "Macca/Tarch", points: 0 },
+    { id: 7, name: "Bennet/Shark", points: 0 },
+    { id: 8, name: "Iddles/Niz", points: 0 }
+];
+
+// Payment Confirmation Component (keep the previous implementation)
+const PaymentConfirmation = ({ show, onClose, details }: any) => {
     if (!show || !details) return null;
 
     return (
@@ -46,11 +58,6 @@ const PaymentConfirmation = ({ show, onClose, details }: PaymentConfirmationProp
                         <p>Game: {details.gameType}</p>
                         <p>Time: {details.timestamp}</p>
                     </div>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                        <h3 className="font-medium mb-2">Contact Information:</h3>
-                        <p>For educational demonstration only</p>
-                        <p>Reference: {details.id}</p>
-                    </div>
                 </div>
                 <button
                     onClick={onClose}
@@ -63,13 +70,9 @@ const PaymentConfirmation = ({ show, onClose, details }: PaymentConfirmationProp
     );
 };
 
-interface OddsCalculatorProps {
-    title: string;
-}
-
 // Odds Calculator Component
-const OddsCalculator = ({ title }: OddsCalculatorProps) => {
-    const [players, setPlayers] = useState<Player[]>([]);
+const OddsCalculator = ({ title }: { title: string }) => {
+    const [players, setPlayers] = useState<Player[]>(DEFAULT_PLAYERS);
     const [selectedPlayer, setSelectedPlayer] = useState('');
     const [pointsToAdd, setPointsToAdd] = useState('');
     const [contributorName, setContributorName] = useState('');
@@ -77,40 +80,46 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [confirmationDetails, setConfirmationDetails] = useState<HistoryEntry | null>(null);
 
-    // Fetch initial players based on the title
+    // Fetch game data on component mount
     useEffect(() => {
-        const fetchPlayers = async () => {
+        const fetchGameData = async () => {
             try {
-                const response = await fetch('/players-odds-data.json');
-                const data = await response.json();
+                // Create a unique key for each game type
+                const gameKey = `brad-bennett-${title.replace(/\s+/g, '-').toLowerCase()}`;
 
-                // Determine which category to use based on the title
-                const categoryKey = title.includes('Winner')
-                    ? 'bradBennettCupWinner'
-                    : 'bradBennettCupWoodenSpoon';
+                // Try to retrieve existing data
+                const existingData = await kv.get(gameKey) as GameData | null;
 
-                const initialPlayers = data[categoryKey].players;
-                setPlayers(initialPlayers);
+                if (existingData) {
+                    setPlayers(existingData.players);
+                    setHistory(existingData.history);
+                }
             } catch (error) {
-                console.error('Error fetching players:', error);
-                // Fallback to default players if fetch fails
-                setPlayers([
-                    { id: 1, name: 'Al T/Cuts 🏆', points: 0 },
-                    { id: 2, name: 'Mitzi/Bondy', points: 0 },
-                    { id: 3, name: 'Woody/Foulsh', points: 0 },
-                    { id: 4, name: 'Pitovich/Berts', points: 0 },
-                    { id: 5, name: 'Xav/Tubs', points: 0 },
-                    { id: 6, name: 'Macca/Tarch', points: 0 },
-                    { id: 7, name: 'Bennet/Shark', points: 0 },
-                    { id: 8, name: 'Iddles/Niz', points: 0 }
-                ]);
+                console.error('Error fetching game data:', error);
             }
         };
 
-        fetchPlayers();
+        fetchGameData();
     }, [title]);
 
-    const handleButtonClick = () => {
+    const updateGameData = async (newPlayers: Player[], newHistory: HistoryEntry[]) => {
+        try {
+            const gameKey = `brad-bennett-${title.replace(/\s+/g, '-').toLowerCase()}`;
+
+            // Update both local state and Vercel KV
+            await kv.set(gameKey, JSON.stringify({
+                players: newPlayers,
+                history: newHistory
+            }));
+
+            setPlayers(newPlayers);
+            setHistory(newHistory);
+        } catch (error) {
+            console.error('Error updating game data:', error);
+        }
+    };
+
+    const handleButtonClick = async () => {
         if (!selectedPlayer || !pointsToAdd || !contributorName) {
             return;
         }
@@ -154,10 +163,10 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
             paid: false
         };
 
-        setPlayers(playersWithOdds);
-        setHistory([historyEntry, ...history]);
+        // Update game data
+        await updateGameData(playersWithOdds, [historyEntry, ...history]);
 
-        // Show confirmation with details
+        // Show confirmation
         setConfirmationDetails(historyEntry);
         setShowConfirmation(true);
 
@@ -167,12 +176,15 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
         setContributorName('');
     };
 
-    const togglePaymentStatus = (entryId: number) => {
-        setHistory(prevHistory => prevHistory.map(entry =>
+    const togglePaymentStatus = async (entryId: number) => {
+        const updatedHistory = history.map(entry =>
             entry.id === entryId
                 ? { ...entry, paid: !entry.paid }
                 : entry
-        ));
+        );
+
+        // Update game data
+        await updateGameData(players, updatedHistory);
     };
 
     // Calculate total points and odds
