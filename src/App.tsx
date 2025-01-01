@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 
 interface HistoryEntry {
     id: number;
@@ -86,7 +86,22 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [confirmationDetails, setConfirmationDetails] = useState<HistoryEntry | null>(null);
 
-    const handleButtonClick = () => {
+    // Load initial data
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const response = await fetch('/api/bets');
+                const data = await response.json();
+                if (data.players) setPlayers(data.players);
+                if (data.history) setHistory(data.history);
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        };
+        loadData();
+    }, []);
+
+    const handleButtonClick = async () => {
         if (!selectedPlayer || !pointsToAdd || !contributorName) {
             return;
         }
@@ -118,8 +133,25 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
             paid: false
         };
 
+        // Update state
         setPlayers(newPlayers);
         setHistory([historyEntry, ...history]);
+
+        // Save to API
+        try {
+            await fetch('/api/bets', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    players: newPlayers,
+                    history: [historyEntry, ...history]
+                }),
+            });
+        } catch (error) {
+            console.error('Failed to save bet:', error);
+        }
 
         // Show confirmation with details
         setConfirmationDetails(historyEntry);
@@ -131,13 +163,32 @@ const OddsCalculator = ({ title }: OddsCalculatorProps) => {
         setContributorName('');
     };
 
-    const togglePaymentStatus = (entryId: number) => {
-        setHistory(prevHistory => prevHistory.map(entry =>
+    const togglePaymentStatus = async (entryId: number) => {
+        const updatedHistory = history.map(entry =>
             entry.id === entryId
                 ? { ...entry, paid: !entry.paid }
                 : entry
-        ));
+        );
+        setHistory(updatedHistory);
+
+        try {
+            await fetch('/api/bets/payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    entryId,
+                    paid: !history.find(entry => entry.id === entryId)?.paid
+                }),
+            });
+        } catch (error) {
+            console.error('Failed to update payment status:', error);
+        }
     };
+
+
+    ////
 
     // Calculate total points and odds
     const totalPoints = players.reduce((sum, player) => sum + player.points, 0);
